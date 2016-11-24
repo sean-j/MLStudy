@@ -6,7 +6,7 @@ import numpy as np
 
 __author__ = 'sean.j'
 
-xy = np.loadtxt('train_05.csv', unpack=True, dtype='float32')
+xy = np.loadtxt('./data/train_05.csv', unpack=True, dtype='float32')
 x_data = xy[0:-1]
 y_data = xy[-1]
 

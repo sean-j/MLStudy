@@ -12,7 +12,7 @@ x_data = [[1., 1., 1., 1., 1.],
           [0., 2., 0., 4., 0.]]
 y_data = [1, 2, 3, 4, 5]
 '''
-xy = np.loadtxt('train_04.csv', unpack=True, dtype='float32')
+xy = np.loadtxt('./data/train_04.csv', unpack=True, dtype='float32')
 x_data = xy[0:-1]
 y_data = xy[-1]
 

@@ -6,7 +6,7 @@ import numpy as np
 
 __author__ = 'sean.j'
 
-xy = np.loadtxt('train_06.csv', unpack=True, dtype='float32')
+xy = np.loadtxt('./data/train_06.csv', unpack=True, dtype='float32')
 x_data = np.transpose(xy[0:3])
 y_data = np.transpose(xy[3:])
 

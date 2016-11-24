@@ -16,18 +16,21 @@ print y_data
 X = tf.placeholder(tf.float32)
 Y = tf.placeholder(tf.float32)
 
-W1 = tf.Variable(tf.random_uniform([2, 2], -1.0, 1.0))
-W2 = tf.Variable(tf.random_uniform([2, 1], -1.0, 1.0))
+W1 = tf.Variable(tf.random_uniform([2, 5], -1.0, 1.0))
+W2 = tf.Variable(tf.random_uniform([5, 4], -1.0, 1.0))
+W3 = tf.Variable(tf.random_uniform([4, 1], -1.0, 1.0))
 
-b1 = tf.Variable(tf.zeros([2]), name='Bias1')
-b2 = tf.Variable(tf.zeros([1]), name='Bias2')
+b1 = tf.Variable(tf.zeros([5]), name='Bias1')
+b2 = tf.Variable(tf.zeros([4]), name='Bias2')
+b3 = tf.Variable(tf.zeros([1]), name='Bias3')
 
 L2 = tf.sigmoid(tf.matmul(X, W1) + b1)
-hypothesis = tf.sigmoid(tf.matmul(L2, W2) + b2)
+L3 = tf.sigmoid(tf.matmul(L2, W2) + b2)
+hypothesis = tf.sigmoid(tf.matmul(L3, W3) + b3)
 
 learning_rate = 0.1
-reg_strength = 0
-l2reg = tf.reduce_sum(tf.square(W1) + tf.square(W2))
+#reg_strength = 0
+#l2reg = tf.reduce_sum(tf.square(W1) + tf.square(W2))
 
 cost = -tf.reduce_mean(Y * tf.log(hypothesis) + (1 - Y) * tf.log(1 - hypothesis))  #+ reg_strength * l2reg
 training = tf.train.GradientDescentOptimizer(learning_rate=learning_rate).minimize(cost)
