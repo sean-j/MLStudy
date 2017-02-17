@@ -2,86 +2,80 @@
 # -*- coding:utf-8 -*-
 
 import tensorflow as tf
-import matplotlib.pyplot as plt
-from random import randint
+import numpy as np
 from lib import minist_data as md
 
 __author__ = 'sean.j'
 
-def xaver_init(n_inputs, n_outputs, uniform = True):
-    if uniform:
-        init_range = tf.sqrt(6.0/ (n_inputs + n_outputs))
-        return tf.random_uniform_initializer(-init_range, init_range)
-    else:
-        stddev = tf.sqrt(3.0 / (n_inputs + n_outputs))
-        return tf.truncated_normal_initializer(stddev=stddev)
+def init_weights(shape):
+    return tf.Variable(tf.random_normal(shape, stddev=0.01))
+
+def model(X, w1, w2, w3, w4, w_o, p_keep_conv, p_keep_hidden):
+    l1a = tf.nn.relu(tf.nn.conv2d(X, w1, strides=[1, 1, 1, 1,], padding='SAME'))
+    l1 = tf.nn.max_pool(l1a, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+    l1 = tf.nn.dropout(l1, p_keep_conv)
+
+    l2a = tf.nn.relu(tf.nn.conv2d(l1, w2, strides=[1, 1, 1, 1], padding='SAME'))
+    l2 = tf.nn.max_pool(l2a, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+    l2 = tf.nn.dropout(l2, p_keep_conv)
+
+    l3a = tf.nn.relu(tf.nn.conv2d(l2, w3, strides=[1, 1, 1, 1], padding='SAME'))
+    l3 = tf.nn.max_pool(l3a, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+
+    l3 = tf.reshape(l3, [-1, w4.get_shape().as_list()[0]])
+    l3 = tf.nn.dropout(l3, p_keep_conv)
+
+    l4 = tf.nn.relu(tf.matmul(l3, w4))
+    l4 = tf.nn.dropout(l4, p_keep_hidden)
+
+    return tf.matmul(l4, w_o)
 
 
-learning_rate = 0.0005
-training_epochs = 15
-batch_size = 100
-display_step = 1
+mnist = md.read_data_sets('MNIST_data/', one_hot=True)
 
-X = tf.placeholder("float", [None, 28 * 28])
+trX, trY, teX, teY = mnist.train.images, mnist.train.labels, mnist.test.images, mnist.test.labels
+trX = trX.reshape(-1, 28, 28, 1)
+teX = teX.reshape(-1, 28, 28, 1)
+
+X = tf.placeholder("float", [None, 28, 28, 1])
 Y = tf.placeholder("float", [None, 10])
 
-W1 = tf.get_variable('W1', shape=[784, 256], initializer=xaver_init(784, 256))
-W2 = tf.get_variable('W2', shape=[256, 256], initializer=xaver_init(256, 256))
-W3 = tf.get_variable('W3', shape=[256, 256], initializer=xaver_init(256, 256))
-W4 = tf.get_variable('W4', shape=[256, 256], initializer=xaver_init(256, 256))
-W5 = tf.get_variable('W5', shape=[256, 10], initializer=xaver_init(256, 10))
+w1 = init_weights([3, 3, 1, 32])
+w2 = init_weights([3, 3, 32, 64])
+w3 = init_weights([3, 3, 64, 128])
+w4 = init_weights([128 * 4 * 4, 625])
+w_o = init_weights([625, 10])
 
-b1 = tf.Variable(tf.zeros([256]))
-b2 = tf.Variable(tf.zeros([256]))
-b3 = tf.Variable(tf.zeros([256]))
-b4 = tf.Variable(tf.zeros([256]))
-b5 = tf.Variable(tf.zeros([10]))
+learning_rate = 0.001
+decay = 0.9
+training_epochs = 15
+batch_size = 128
+test_size = 256
 
-dropout_rate = tf.placeholder('float')
-_L1 = tf.nn.relu(tf.add(tf.matmul(X, W1), b1))
-L1 = tf.nn.dropout(_L1, dropout_rate)
-_L2 = tf.nn.relu(tf.add(tf.matmul(L1, W2), b2))
-L2 = tf.nn.dropout(_L2, dropout_rate)
-_L3 = tf.nn.relu(tf.add(tf.matmul(L2, W3), b3))
-L3 = tf.nn.dropout(_L3, dropout_rate)
-_L4 = tf.nn.relu(tf.add(tf.matmul(L3, W4), b4))
-L4 = tf.nn.dropout(_L4, dropout_rate)
+pc = tf.placeholder('float')
+ph = tf.placeholder('float')
 
-hypothesis = tf.add(tf.matmul(L4, W5), b5)
+py_x = model(X, w1, w2, w3, w4, w_o, pc, ph)
 
-cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(hypothesis, Y))
-optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(cost)
+cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(py_x, Y))
+#optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(cost)
+optimizer = tf.train.RMSPropOptimizer(learning_rate=learning_rate, decay=decay).minimize(cost)
+predicter = tf.argmax(py_x, 1)
 
-init = tf.initialize_all_variables()
-
-mnist = md.read_data_sets("MNIST_data/", one_hot=True)
-checkpoint_dir = "cps/"
 
 with tf.Session() as sess:
-    sess.run(init)
+    tf.initialize_all_variables().run()
 
     for epoch in range(training_epochs):
-        avg_cost = 0.
-        total_batch = int(mnist.train.num_examples / batch_size)
-        for i in range(total_batch):
-            batch_xs, batch_ys = mnist.train.next_batch(batch_size)
-            sess.run(optimizer, feed_dict={X: batch_xs, Y: batch_ys, dropout_rate: 0.7})
-            avg_cost += sess.run(cost, feed_dict={X: batch_xs, Y: batch_ys, dropout_rate: 0.7}) / total_batch
+        training_batch = zip(range(0, len(trX), batch_size), range(batch_size, len(trX) + 1, batch_size))
+        for start, end in training_batch:
+            sess.run(optimizer, feed_dict={X: trX[start:end], Y: trY[start:end], pc: 0.8, ph: 0.5})
 
-        if epoch % display_step == 0:
-            print ("Epoch:", '%04d' % (epoch + 1), "cost=", "{:.9f}".format(avg_cost))
+        test_indices = np.arange(len(teX))
+        np.random.shuffle(test_indices)
+        test_indices = test_indices[0: test_size]
+
+        print (epoch, np.mean(np.argmax(teY[test_indices], axis=1) == sess.run(predicter, feed_dict={X: teX[test_indices], pc: 1.0, ph: 1.0})))
 
     print ("Optimization Finished!")
 
-    correct_prediction = tf.equal(tf.argmax(hypothesis, 1), tf.argmax(Y, 1))
-    accuracy = tf.reduce_mean(tf.cast(correct_prediction, 'float'))
-    print 'Accuracy: ', accuracy.eval({X: mnist.test.images, Y: mnist.test.labels, dropout_rate: 1})
-
-    '''
-    r = randint(0, mnist.test.num_examples - 1)
-    print 'Label: ', sess.run(tf.argmax(mnist.test.labels[r: r+1], 1))
-    print 'Prediction: ', sess.run(tf.argmax(activation, 1), {x: mnist.test.images[r:r + 1]})
-
-    plt.imshow(mnist.test.images[r:r+ 1].reshape(28, 28), cmap='Greys', interpolation='nearest')
-    plt.show()
-    '''
